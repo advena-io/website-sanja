@@ -1,0 +1,21 @@
+{
+  "name": "website-sanja-mandaric",
+  "version": "1.0.0",
+  "description": "Website for lawyer Sanja Mandarić",
+  "main": "build.js",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js && npx serve dist"
+  },
+  "keywords": [
+    "lawyer",
+    "advokat",
+    "static-site"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "fs-extra": "^11.2.0"
+  }
+}
+
