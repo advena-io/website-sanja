@@ -20,10 +20,15 @@
                 <li><a href="kontakt.html" class="nav-link">Контакт</a></li>
             </ul>
             <div class="script-switcher">
-                <a href="../lat/{{LAT_PAGE}}" class="script-btn">Лат</a>
+                <a href="../lat/{{LAT_PAGE}}" class="script-btn">Lat</a>
                 <a href="{{CYR_PAGE}}" class="script-btn active">Ћир</a>
                 <a href="../eng/{{ENG_PAGE}}" class="script-btn">Eng</a>
             </div>
+            <select class="script-switcher-select" aria-label="Select language">
+                <option value="../lat/{{LAT_PAGE}}">Lat</option>
+                <option value="{{CYR_PAGE}}" selected>Ћир</option>
+                <option value="../eng/{{ENG_PAGE}}">Eng</option>
+            </select>
         </div>
     </nav>
 </header>

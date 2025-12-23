@@ -33,4 +33,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Language switcher dropdown
+    const languageSelect = document.querySelector('.script-switcher-select');
+    if (languageSelect) {
+        languageSelect.addEventListener('change', function() {
+            const selectedUrl = this.value;
+            if (selectedUrl) {
+                window.location.href = selectedUrl;
+            }
+        });
+    }
 });
