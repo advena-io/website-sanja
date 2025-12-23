@@ -12,125 +12,62 @@ if (fs.existsSync(assetsDir)) {
   fs.copySync(assetsDir, distAssetsDir);
 }
 
-// Read templates
-const templatesDir = path.join(__dirname, 'src', 'templates');
-const partialsDir = path.join(templatesDir, 'partials');
-
-function readTemplate(name) {
-  return fs.readFileSync(path.join(templatesDir, `${name}.html`), 'utf8');
+// Read templates from script-specific directories
+function readTemplate(script, name) {
+  const templatePath = path.join(__dirname, 'src', 'templates', script, `${name}.html`);
+  return fs.readFileSync(templatePath, 'utf8');
 }
 
-function readPartial(name) {
-  return fs.readFileSync(path.join(partialsDir, `${name}.html`), 'utf8');
+function readPartial(script, name) {
+  const partialPath = path.join(__dirname, 'src', 'templates', script, 'partials', `${name}.html`);
+  return fs.readFileSync(partialPath, 'utf8');
 }
 
-// Extract only Latin or Cyrillic text from content
-function extractScript(content, script) {
-  if (script === 'latin') {
-    // Remove cyrillic-text spans and their content completely
-    let result = content.replace(/<span class="cyrillic-text">[\s\S]*?<\/span>/g, '');
-    // Remove latin-text opening tags
-    result = result.replace(/<span class="latin-text">/g, '');
-    // Remove closing spans that immediately follow (were part of latin-text)
-    result = result.replace(/([^<]*)<\/span>(?=\s*<[^\/]|$)/g, '$1');
-    // Clean up any double closing spans
-    result = result.replace(/<\/span><\/span>/g, '</span>');
-    return result;
-  } else {
-    // Remove latin-text spans and their content completely
-    let result = content.replace(/<span class="latin-text">[\s\S]*?<\/span>/g, '');
-    // Remove cyrillic-text opening tags
-    result = result.replace(/<span class="cyrillic-text">/g, '');
-    // Remove closing spans that immediately follow (were part of cyrillic-text)
-    result = result.replace(/([^<]*)<\/span>(?=\s*<[^\/]|$)/g, '$1');
-    // Clean up any double closing spans
-    result = result.replace(/<\/span><\/span>/g, '</span>');
-    return result;
-  }
+function readBase() {
+  const basePath = path.join(__dirname, 'src', 'templates', 'base.html');
+  return fs.readFileSync(basePath, 'utf8');
 }
 
-// Update links based on script and page location
-function updateLinks(content, script, isCyrillicPage) {
-  // List of page URLs
-  const pageUrls = ['index.html', 'o-meni.html', 'oblasti-rada.html', 'kako-radim.html', 'kontakt.html'];
+function renderPage(pageName, content, script, pageUrl, pageData) {
+  const header = readPartial(script, 'header');
+  const footer = readPartial(script, 'footer');
+  const base = readBase();
   
-  if (isCyrillicPage) {
-    // For cyrillic pages (in cyr/ folder), ensure all internal page links are relative
-    // Ensure logo link is relative
-    content = content.replace(/href="index\.html" class="logo"/g, 'href="index.html" class="logo"');
-    
-    // Ensure all internal page links are relative (not pointing to ../lat/)
-    pageUrls.forEach(pageUrl => {
-      // Remove any ../lat/ prefix from internal links
-      const escaped = pageUrl.replace('.', '\\.');
-      content = content.replace(new RegExp(`href="../lat/${escaped}"`, 'g'), `href="${pageUrl}"`);
-      // Also ensure no absolute paths to lat folder
-      content = content.replace(new RegExp(`href="lat/${escaped}"`, 'g'), `href="${pageUrl}"`);
-    });
-  } else {
-    // For latin pages (in lat/ folder), ensure all links stay relative
-    // Ensure logo link is relative
-    content = content.replace(/href="index\.html" class="logo"/g, 'href="index.html" class="logo"');
-    
-    // Ensure all internal page links are relative (not pointing to ../cyr/)
-    pageUrls.forEach(pageUrl => {
-      // Remove any ../cyr/ prefix from internal links
-      const escaped = pageUrl.replace('.', '\\.');
-      content = content.replace(new RegExp(`href="../cyr/${escaped}"`, 'g'), `href="${pageUrl}"`);
-      // Also ensure no absolute paths to cyr folder
-      content = content.replace(new RegExp(`href="cyr/${escaped}"`, 'g'), `href="${pageUrl}"`);
-    });
-  }
+  // Get URLs for all language versions
+  const latUrl = `${pageData.url}.html`;
+  const cyrUrl = `${pageData.url}.html`;
+  const engUrl = `${(pageData.englishUrl || pageData.url)}.html`;
   
-  return content;
-}
-
-function renderPage(pageName, content, script, pageUrl) {
-  const header = readPartial('header');
-  const footer = readPartial('footer');
-  const base = readTemplate('base');
-  
-  const isCyrillicPage = script === 'cyrillic';
-  const currentPageUrl = `${pageUrl}.html`;
-  
-  // Extract script-specific content
-  let extractedHeader = extractScript(header, script);
-  let extractedFooter = extractScript(footer, script);
-  let extractedContent = extractScript(content, script);
-  
-  // Update links
-  extractedHeader = updateLinks(extractedHeader, script, isCyrillicPage);
-  extractedContent = updateLinks(extractedContent, script, isCyrillicPage);
+  // Replace language-specific placeholders in header
+  let headerWithPage = header
+    .replace(/\{\{LAT_PAGE\}\}/g, latUrl)
+    .replace(/\{\{CYR_PAGE\}\}/g, cyrUrl)
+    .replace(/\{\{ENG_PAGE\}\}/g, engUrl);
   
   // Update base template with script-specific content
   let html = base
-    .replace('{{HEADER}}', extractedHeader)
-    .replace('{{CONTENT}}', extractedContent)
-    .replace('{{FOOTER}}', extractedFooter)
+    .replace('{{HEADER}}', headerWithPage)
+    .replace('{{CONTENT}}', content)
+    .replace('{{FOOTER}}', footer)
     .replace('{{PAGE_NAME}}', pageName);
   
-  // Fix script switcher links in final HTML to point to same page in other script
-  if (isCyrillicPage) {
-    // For cyrillic pages: "Лат" should point to ../lat/[current-page].html, "Ћир" should be active
-    const latinPageUrl = `../lat/${currentPageUrl}`;
-    html = html.replace(/<a href="[^"]*" class="script-btn[^"]*">Лат<\/a>/g, `<a href="${latinPageUrl}" class="script-btn">Лат</a>`);
-    html = html.replace(/<a href="[^"]*" class="script-btn[^"]*">Ћир<\/a>/g, `<a href="${currentPageUrl}" class="script-btn active">Ћир</a>`);
-    // Also handle case where there might be closing span tag
-    html = html.replace(/<a href="[^"]*" class="script-btn[^"]*">Лат<\/span><\/a>/g, `<a href="${latinPageUrl}" class="script-btn">Лат</a>`);
-    html = html.replace(/<a href="[^"]*" class="script-btn[^"]*">Ћир<\/span><\/a>/g, `<a href="${currentPageUrl}" class="script-btn active">Ћир</a>`);
-  } else {
-    // For latin pages: "Lat" should be active, "Ћир" should point to ../cyr/[current-page].html
-    const cyrillicPageUrl = `../cyr/${currentPageUrl}`;
-    html = html.replace(/<a href="[^"]*" class="script-btn[^"]*">Lat<\/a>/g, `<a href="${currentPageUrl}" class="script-btn active">Lat</a>`);
-    html = html.replace(/<a href="[^"]*" class="script-btn[^"]*">Ћир<\/a>/g, `<a href="${cyrillicPageUrl}" class="script-btn">Ћир</a>`);
-    // Also handle case where there might be closing span tag
-    html = html.replace(/<a href="[^"]*" class="script-btn[^"]*">Lat<\/span><\/a>/g, `<a href="${currentPageUrl}" class="script-btn active">Lat</a>`);
-    html = html.replace(/<a href="[^"]*" class="script-btn[^"]*">Ћир<\/span><\/a>/g, `<a href="${cyrillicPageUrl}" class="script-btn">Ћир</a>`);
-  }
-  
-  // Update lang attribute and title based on script
-  if (script === 'cyrillic') {
+  // Update lang attribute and meta tags based on script
+  if (script === 'cyr') {
     html = html.replace('lang="sr"', 'lang="sr-Cyrl"');
+  } else if (script === 'eng') {
+    html = html.replace('lang="sr"', 'lang="en"');
+    html = html.replace(
+      '<title>Advokat Sanja Mandarić | Imovinsko i porodično pravo | Pančevo</title>',
+      '<title>Attorney Sanja Mandarić | Property and Family Law | Pančevo</title>'
+    );
+    html = html.replace(
+      '<meta name="description" content="Advokat Sanja Mandarić, Pančevo. Više od 15 godina iskustva u imovinskom, porodičnom i odštetnom pravu, uz profesionalan i smiren pristup.">',
+      '<meta name="description" content="Attorney Sanja Mandarić, Pančevo. Over 15 years of experience in property, family, and tort law, with a professional and calm approach.">'
+    );
+    html = html.replace(
+      '<meta name="keywords" content="advokat Pančevo, imovinsko pravo Pančevo, porodični advokat, razvod braka advokat, naknada štete advokat">',
+      '<meta name="keywords" content="attorney Pančevo, property law Pančevo, family attorney, divorce attorney, damage compensation attorney">'
+    );
   }
   
   return html;
@@ -138,11 +75,11 @@ function renderPage(pageName, content, script, pageUrl) {
 
 // Generate pages
 const pages = [
-  { name: 'index', url: 'index', title: 'Početna', cyrillicTitle: 'Почетна' },
-  { name: 'about', url: 'o-meni', title: 'O meni', cyrillicTitle: 'О мени' },
-  { name: 'practice-areas', url: 'oblasti-rada', title: 'Oblasti rada', cyrillicTitle: 'Области рада' },
-  { name: 'how-i-work', url: 'kako-radim', title: 'Kako radim', cyrillicTitle: 'Како радим' },
-  { name: 'contact', url: 'kontakt', title: 'Kontakt', cyrillicTitle: 'Контакт' }
+  { name: 'index', url: 'index', title: 'Početna', cyrillicTitle: 'Почетна', englishTitle: 'Home' },
+  { name: 'about', url: 'o-meni', title: 'O meni', cyrillicTitle: 'О мени', englishUrl: 'about', englishTitle: 'About me' },
+  { name: 'practice-areas', url: 'oblasti-rada', title: 'Oblasti rada', cyrillicTitle: 'Области рада', englishUrl: 'practice-areas', englishTitle: 'Practice areas' },
+  { name: 'how-i-work', url: 'kako-radim', title: 'Kako radim', cyrillicTitle: 'Како радим', englishUrl: 'how-i-work', englishTitle: 'How I work' },
+  { name: 'contact', url: 'kontakt', title: 'Kontakt', cyrillicTitle: 'Контакт', englishUrl: 'contact', englishTitle: 'Contact' }
 ];
 
 // Generate Latin pages in lat/ subdirectory
@@ -150,8 +87,8 @@ const latinDir = path.join(distDir, 'lat');
 fs.ensureDirSync(latinDir);
 
 pages.forEach(page => {
-  const content = readTemplate(page.name);
-  const html = renderPage(page.title, content, 'latin', page.url);
+  const content = readTemplate('lat', page.name);
+  const html = renderPage(page.title, content, 'lat', page.url, page);
   const outputPath = path.join(latinDir, `${page.url}.html`);
   fs.writeFileSync(outputPath, html, 'utf8');
 });
@@ -161,13 +98,25 @@ const cyrillicDir = path.join(distDir, 'cyr');
 fs.ensureDirSync(cyrillicDir);
 
 pages.forEach(page => {
-  const content = readTemplate(page.name);
-  const html = renderPage(page.cyrillicTitle, content, 'cyrillic', page.url);
+  const content = readTemplate('cyr', page.name);
+  const html = renderPage(page.cyrillicTitle, content, 'cyr', page.url, page);
   const outputPath = path.join(cyrillicDir, `${page.url}.html`);
   fs.writeFileSync(outputPath, html, 'utf8');
 });
 
-// Create root index.html that redirects to lat/index.html
+// Generate English pages in eng/ subdirectory
+const englishDir = path.join(distDir, 'eng');
+fs.ensureDirSync(englishDir);
+
+pages.forEach(page => {
+  const content = readTemplate('eng', page.name);
+  const pageUrl = page.englishUrl || page.url;
+  const html = renderPage(page.englishTitle, content, 'eng', pageUrl, page);
+  const outputPath = path.join(englishDir, `${pageUrl}.html`);
+  fs.writeFileSync(outputPath, html, 'utf8');
+});
+
+// Create root index.html that redirects to Latin version
 const rootIndex = `<!DOCTYPE html>
 <html lang="sr">
 <head>
@@ -186,4 +135,5 @@ fs.writeFileSync(path.join(distDir, 'index.html'), rootIndex, 'utf8');
 console.log('✓ Website built successfully!');
 console.log(`✓ Latin pages: ${latinDir}`);
 console.log(`✓ Cyrillic pages: ${cyrillicDir}`);
+console.log(`✓ English pages: ${englishDir}`);
 console.log(`✓ Root index.html redirects to lat/index.html`);
