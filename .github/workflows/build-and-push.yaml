@@ -111,8 +111,8 @@ jobs:
           event-type: "update-docker-image"
           client-payload: |
             {
-              "namespace": "app-tokatiti-dev",
-              "app": "tokatiti-dev",
+              "namespace": "app-sanja-dev",
+              "app": "sanja-dev",
               "image_name": "${{ env.IMAGE_NAME }}",
               "image_tag": "${{ needs.build-and-push.outputs.image_tag }}",
 
